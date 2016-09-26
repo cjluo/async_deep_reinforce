@@ -21,8 +21,6 @@ from constants import INITIAL_ALPHA_LOG_RATE
 from constants import MAX_TIME_STEP
 from constants import CHECKPOINT_DIR
 from constants import LOG_FILE
-from constants import RMSP_EPSILON
-from constants import RMSP_ALPHA
 from constants import GRAD_NORM_CLIP
 from constants import USE_GPU
 from constants import USE_LSTM
@@ -57,9 +55,7 @@ training_threads = []
 learning_rate_input = tf.placeholder("float")
 
 grad_applier = RMSPropApplier(learning_rate = learning_rate_input,
-                              decay = RMSP_ALPHA,
                               momentum = 0.0,
-                              epsilon = RMSP_EPSILON,
                               clip_norm = GRAD_NORM_CLIP,
                               device = device)
 
@@ -106,7 +102,7 @@ else:
 
 def train_function(parallel_index):
   global global_t
-  
+
   training_thread = training_threads[parallel_index]
   # set start_time
   start_time = time.time() - wall_t
@@ -121,17 +117,17 @@ def train_function(parallel_index):
     diff_global_t = training_thread.process(sess, global_t, summary_writer,
                                             summary_op, score_input)
     global_t += diff_global_t
-    
-    
+
+
 def signal_handler(signal, frame):
   global stop_requested
   print('You pressed Ctrl+C!')
   stop_requested = True
-  
+
 train_threads = []
 for i in range(PARALLEL_SIZE):
   train_threads.append(threading.Thread(target=train_function, args=(i,)))
-  
+
 signal.signal(signal.SIGINT, signal_handler)
 
 # set start time
@@ -144,12 +140,12 @@ print('Press Ctrl+C to stop')
 signal.pause()
 
 print('Now saving data. Please wait')
-  
+
 for t in train_threads:
   t.join()
 
 if not os.path.exists(CHECKPOINT_DIR):
-  os.mkdir(CHECKPOINT_DIR)  
+  os.mkdir(CHECKPOINT_DIR)
 
 # write wall time
 wall_t = time.time() - start_time
