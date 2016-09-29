@@ -5,7 +5,6 @@ import random
 import time
 import sys
 
-from accum_trainer import AccumTrainer
 from game_state import GameState
 from game_state import ACTION_SIZE
 from game_ac_network import GameACFFNetwork, GameACLSTMNetwork
@@ -37,19 +36,11 @@ class A3CTrainingThread(object):
     else:
       self.local_network = GameACFFNetwork(ACTION_SIZE, device)
 
-    self.local_network.prepare_loss(ENTROPY_BETA)
-
-    # TODO: don't need accum trainer anymore with batch
-    self.trainer = AccumTrainer(device)
-    self.trainer.prepare_minimize( self.local_network.total_loss,
-                                   self.local_network.get_vars() )
-
-    self.accum_gradients = self.trainer.accumulate_gradients()
-    self.reset_gradients = self.trainer.reset_gradients()
+    self.local_network.prepare_loss(ENTROPY_BETA, learning_rate_input)
 
     self.apply_gradients = grad_applier.apply_gradients(
       global_network.get_vars(),
-      self.trainer.get_accum_grad_list() )
+      self.local_network.get_grads())
 
     self.sync = self.local_network.sync_from(global_network)
 
@@ -89,9 +80,6 @@ class A3CTrainingThread(object):
     values = []
 
     terminal_end = False
-
-    # reset accumulated gradients
-    sess.run( self.reset_gradients )
 
     # copy weights from shared to local
     sess.run( self.sync )
@@ -170,26 +158,23 @@ class A3CTrainingThread(object):
       batch_td.reverse()
       batch_R.reverse()
 
-      sess.run( self.accum_gradients,
-                feed_dict = {
-                  self.local_network.s: batch_si,
-                  self.local_network.a: batch_a,
-                  self.local_network.td: batch_td,
-                  self.local_network.r: batch_R,
-                  self.local_network.initial_lstm_state: start_lstm_state,
-                  self.local_network.step_size : [len(batch_a)] } )
+      feed_dict = {
+        self.local_network.s: batch_si,
+        self.local_network.a: batch_a,
+        self.local_network.td: batch_td,
+        self.local_network.r: batch_R,
+        self.local_network.initial_lstm_state: start_lstm_state,
+        self.local_network.step_size : [len(batch_a)] }
     else:
-      sess.run( self.accum_gradients,
-                feed_dict = {
-                  self.local_network.s: batch_si,
-                  self.local_network.a: batch_a,
-                  self.local_network.td: batch_td,
-                  self.local_network.r: batch_R} )
+      feed_dict = {
+        self.local_network.s: batch_si,
+        self.local_network.a: batch_a,
+        self.local_network.td: batch_td,
+        self.local_network.r: batch_R}
 
     cur_learning_rate = self._anneal_learning_rate(global_t)
-
-    sess.run( self.apply_gradients,
-              feed_dict = { self.learning_rate_input: cur_learning_rate } )
+    feed_dict[self.learning_rate_input] = cur_learning_rate
+    sess.run( self.apply_gradients, feed_dict=feed_dict)
 
     if (self.thread_index == 0) and (self.local_t - self.prev_local_t >= PERFORMANCE_LOG_INTERVAL):
       self.prev_local_t += PERFORMANCE_LOG_INTERVAL

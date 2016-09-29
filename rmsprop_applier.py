@@ -75,7 +75,7 @@ class RMSPropApplier(object):
   # TODO: in RMSProp native code, memcpy() (for CPU) and
   # cudaMemcpyAsync() (for GPU) are used when updating values,
   # and values might tend to be overwritten with results from other threads.
-  # (Need to check the learning performance with replacing it)  
+  # (Need to check the learning performance with replacing it)
   def _apply_dense(self, grad, var):
     rms = self.get_slot(var, "rms")
     mom = self.get_slot(var, "momentum")
