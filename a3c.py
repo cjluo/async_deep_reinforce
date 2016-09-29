@@ -24,6 +24,7 @@ from constants import LOG_FILE
 from constants import GRAD_NORM_CLIP
 from constants import USE_GPU
 from constants import USE_LSTM
+from constants import ENTROPY_BETA
 
 
 def log_uniform(lo, hi, rate):
@@ -49,20 +50,15 @@ if USE_LSTM:
 else:
   global_network = GameACFFNetwork(ACTION_SIZE, device)
 
+learning_rate_input = tf.placeholder("float")
+global_network.prepare_loss(ENTROPY_BETA, learning_rate_input)
 
 training_threads = []
-
-learning_rate_input = tf.placeholder("float")
-
-grad_applier = RMSPropApplier(learning_rate = learning_rate_input,
-                              momentum = 0.0,
-                              clip_norm = GRAD_NORM_CLIP,
-                              device = device)
 
 for i in range(PARALLEL_SIZE):
   training_thread = A3CTrainingThread(i, global_network, initial_learning_rate,
                                       learning_rate_input,
-                                      grad_applier, MAX_TIME_STEP,
+                                      GRAD_NORM_CLIP, MAX_TIME_STEP,
                                       device = device)
   training_threads.append(training_thread)
 

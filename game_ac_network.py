@@ -39,13 +39,15 @@ class GameACNetwork(object):
       # gradienet of policy and value are summed up
       self.total_loss = policy_loss + value_loss
 
-      optimizer = tf.train.RMSPropOptimizer(learning_rate)
-      grads_and_vars = optimizer.compute_gradients(
-        self.total_loss, self.get_vars())
-      self._grad_op = [gv[0] for gv in grads_and_vars]
+      self._optimizer = tf.train.RMSPropOptimizer(learning_rate)
 
-  def get_grads(self):
-    return self._grad_op
+  def get_grads(self, grad_clip):
+    grads_and_vars = self._optimizer.compute_gradients(
+      self.total_loss, self.get_vars())
+    return [tf.clip_by_norm(gv[0], grad_clip) for gv in grads_and_vars]
+
+  def apply_grads(self, grads):
+    return self._optimizer.apply_gradients(zip(grads, self.get_vars()))
 
   def run_policy_and_value(self, sess, s_t):
     raise NotImplementedError()

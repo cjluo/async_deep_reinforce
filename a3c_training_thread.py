@@ -23,7 +23,7 @@ class A3CTrainingThread(object):
                global_network,
                initial_learning_rate,
                learning_rate_input,
-               grad_applier,
+               grad_clip,
                max_global_time_step,
                device):
 
@@ -38,9 +38,8 @@ class A3CTrainingThread(object):
 
     self.local_network.prepare_loss(ENTROPY_BETA, learning_rate_input)
 
-    self.apply_gradients = grad_applier.apply_gradients(
-      global_network.get_vars(),
-      self.local_network.get_grads())
+    self.apply_gradients = global_network.apply_grads(
+      self.local_network.get_grads(grad_clip))
 
     self.sync = self.local_network.sync_from(global_network)
 
@@ -174,7 +173,7 @@ class A3CTrainingThread(object):
 
     cur_learning_rate = self._anneal_learning_rate(global_t)
     feed_dict[self.learning_rate_input] = cur_learning_rate
-    sess.run( self.apply_gradients, feed_dict=feed_dict)
+    sess.run(self.apply_gradients, feed_dict=feed_dict)
 
     if (self.thread_index == 0) and (self.local_t - self.prev_local_t >= PERFORMANCE_LOG_INTERVAL):
       self.prev_local_t += PERFORMANCE_LOG_INTERVAL
