@@ -48,7 +48,7 @@ stop_requested = False
 if USE_LSTM:
   global_network = GameACLSTMNetwork(ACTION_SIZE, -1, device)
 else:
-  global_network = GameACFFNetwork(ACTION_SIZE, device)
+  global_network = GameACFFNetwork(ACTION_SIZE, "global", device)
 
 learning_rate_input = tf.placeholder("float")
 global_network.prepare_loss(ENTROPY_BETA, learning_rate_input)

@@ -34,7 +34,8 @@ class A3CTrainingThread(object):
     if USE_LSTM:
       self.local_network = GameACLSTMNetwork(ACTION_SIZE, thread_index, device)
     else:
-      self.local_network = GameACFFNetwork(ACTION_SIZE, device)
+      self.local_network = GameACFFNetwork(
+        ACTION_SIZE, "thread" + str(thread_index), device)
 
     self.local_network.prepare_loss(ENTROPY_BETA, learning_rate_input)
 

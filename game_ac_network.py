@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import tensorflow as tf
+import tensorflow.contrib.layers as layers
 import numpy as np
 from custom_lstm import CustomBasicLSTMCell
 
@@ -108,41 +109,35 @@ class GameACNetwork(object):
 class GameACFFNetwork(GameACNetwork):
   def __init__(self,
                action_size,
+               namespace,
                device="/cpu:0"):
     GameACNetwork.__init__(self, action_size, device)
 
     with tf.device(self._device):
-      self.W_conv1 = self._conv_weight_variable([8, 8, 4, 16])  # stride=4
-      self.b_conv1 = self._conv_bias_variable([16], 8, 8, 4)
-
-      self.W_conv2 = self._conv_weight_variable([4, 4, 16, 32]) # stride=2
-      self.b_conv2 = self._conv_bias_variable([32], 4, 4, 16)
-
-      self.W_fc1 = self._fc_weight_variable([2592, 256])
-      self.b_fc1 = self._fc_bias_variable([256], 2592)
-
-      # weight for policy output layer
-      self.W_fc2 = self._fc_weight_variable([256, action_size])
-      self.b_fc2 = self._fc_bias_variable([action_size], 256)
-
-      # weight for value output layer
-      self.W_fc3 = self._fc_weight_variable([256, 1])
-      self.b_fc3 = self._fc_bias_variable([1], 256)
-
       # state (input)
       self.s = tf.placeholder("float", [None, 84, 84, 4])
 
-      h_conv1 = tf.nn.relu(self._conv2d(self.s, self.W_conv1, 4) + self.b_conv1)
-      h_conv2 = tf.nn.relu(self._conv2d(h_conv1, self.W_conv2, 2) + self.b_conv2)
+      with tf.variable_scope(namespace):
+        h_conv1 = layers.conv2d(self.s, 32, [8, 8], [4, 4], padding='VALID')
+        h_conv2 = layers.conv2d(h_conv1, 64, [4, 4], [2, 2], padding='VALID')
+        h_conv3 = layers.conv2d(h_conv2, 64, [3, 3], [1, 1], padding='VALID')
+        h_conv3_flat = layers.flatten(h_conv3)
 
-      h_conv2_flat = tf.reshape(h_conv2, [-1, 2592])
-      h_fc1 = tf.nn.relu(tf.matmul(h_conv2_flat, self.W_fc1) + self.b_fc1)
+        # policy (output)
+        h_action_fc4 = layers.fully_connected(
+          h_conv3_flat, num_outputs=512, activation_fn=tf.nn.relu)
+        h_action_fc5 = layers.fully_connected(
+          h_action_fc4, num_outputs=self._action_size, activation_fn=None)
+        self.pi = tf.nn.softmax(h_action_fc5)
+        # value (output)
+        h_state_fc4 = layers.fully_connected(
+          h_conv3_flat, num_outputs=512, activation_fn=tf.nn.relu)
+        h_state_fc5 = layers.fully_connected(
+          h_state_fc4, num_outputs=1, activation_fn=None)
+        self.v = tf.reshape(h_state_fc5, [-1])
 
-      # policy (output)
-      self.pi = tf.nn.softmax(tf.matmul(h_fc1, self.W_fc2) + self.b_fc2)
-      # value (output)
-      v_ = tf.matmul(h_fc1, self.W_fc3) + self.b_fc3
-      self.v = tf.reshape( v_, [-1] )
+      self._vars = tf.get_collection(
+        tf.GraphKeys.TRAINABLE_VARIABLES, namespace)
 
   def run_policy_and_value(self, sess, s_t):
     pi_out, v_out = sess.run( [self.pi, self.v], feed_dict = {self.s : [s_t]} )
@@ -157,11 +152,7 @@ class GameACFFNetwork(GameACNetwork):
     return v_out[0]
 
   def get_vars(self):
-    return [self.W_conv1, self.b_conv1,
-            self.W_conv2, self.b_conv2,
-            self.W_fc1, self.b_fc1,
-            self.W_fc2, self.b_fc2,
-            self.W_fc3, self.b_fc3]
+    return self._vars
 
 # Actor-Critic LSTM Network
 class GameACLSTMNetwork(GameACNetwork):
