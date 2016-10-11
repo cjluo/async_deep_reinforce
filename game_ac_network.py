@@ -18,8 +18,11 @@ class GameACNetwork(object):
       # taken action (input for policy)
       self.a = tf.placeholder("float", [None, self._action_size])
 
+      # R (input for value)
+      self.r = tf.placeholder("float", [None])
+
       # temporary difference (R-V) (input for policy)
-      self.td = tf.placeholder("float", [None])
+      td = self.r - self.v
 
       # avoid NaN with clipping when value in pi becomes zero
       log_pi = tf.log(tf.clip_by_value(self.pi, 1e-20, 1.0))
@@ -28,14 +31,11 @@ class GameACNetwork(object):
       entropy = -tf.reduce_sum(self.pi * log_pi, reduction_indices=1)
 
       # policy loss (output)  (Adding minus, because the original paper's objective function is for gradient ascent, but we use gradient descent optimizer.)
-      policy_loss = - tf.reduce_sum( tf.reduce_sum( tf.mul( log_pi, self.a ), reduction_indices=1 ) * self.td + entropy * entropy_beta )
-
-      # R (input for value)
-      self.r = tf.placeholder("float", [None])
+      policy_loss = - tf.reduce_sum( tf.reduce_sum( tf.mul( log_pi, self.a ), reduction_indices=1 ) * td + entropy * entropy_beta )
 
       # value loss (output)
       # (Learning rate for Critic is half of Actor's, so multiply by 0.5)
-      value_loss = 0.5 * tf.nn.l2_loss(self.r - self.v)
+      value_loss = 0.5 * tf.nn.l2_loss(td)
 
       # gradienet of policy and value are summed up
       self.total_loss = policy_loss + value_loss

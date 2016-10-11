@@ -77,7 +77,6 @@ class A3CTrainingThread(object):
     states = []
     actions = []
     rewards = []
-    values = []
 
     terminal_end = False
 
@@ -91,12 +90,11 @@ class A3CTrainingThread(object):
 
     # t_max times loop
     for i in range(LOCAL_T_MAX):
-      pi_, value_ = self.local_network.run_policy_and_value(sess, self.game_state.s_t)
+      pi_ = self.local_network.run_policy(sess, self.game_state.s_t)
       action = self.choose_action(pi_)
 
       states.append(self.game_state.s_t)
       actions.append(action)
-      values.append(value_)
 
       # process game
       self.game_state.process(action)
@@ -133,35 +131,29 @@ class A3CTrainingThread(object):
     actions.reverse()
     states.reverse()
     rewards.reverse()
-    values.reverse()
 
     batch_si = []
     batch_a = []
-    batch_td = []
     batch_R = []
 
     # compute and accmulate gradients
-    for(ai, ri, si, Vi) in zip(actions, rewards, states, values):
+    for(ai, ri, si) in zip(actions, rewards, states):
       R = ri + GAMMA * R
-      td = R - Vi
       a = np.zeros([ACTION_SIZE])
       a[ai] = 1
 
       batch_si.append(si)
       batch_a.append(a)
-      batch_td.append(td)
       batch_R.append(R)
 
     if USE_LSTM:
       batch_si.reverse()
       batch_a.reverse()
-      batch_td.reverse()
       batch_R.reverse()
 
       feed_dict = {
         self.local_network.s: batch_si,
         self.local_network.a: batch_a,
-        self.local_network.td: batch_td,
         self.local_network.r: batch_R,
         self.local_network.initial_lstm_state: start_lstm_state,
         self.local_network.step_size : [len(batch_a)] }
@@ -169,7 +161,6 @@ class A3CTrainingThread(object):
       feed_dict = {
         self.local_network.s: batch_si,
         self.local_network.a: batch_a,
-        self.local_network.td: batch_td,
         self.local_network.r: batch_R}
 
     cur_learning_rate = self._anneal_learning_rate(global_t)
